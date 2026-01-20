@@ -1,117 +1,27 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Hotel Rates Tracker</title>
-    <style>
-        body { font-family: -apple-system, sans-serif; background: #f0f2f5; padding: 20px; display: flex; justify-content: center; }
-        .card { background: white; padding: 25px; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); width: 100%; max-width: 500px; }
-        h2 { margin-top: 0; color: #1c1e21; font-size: 1.2rem; }
-        .input-group { margin-bottom: 15px; }
-        label { display: block; margin-bottom: 5px; font-weight: 600; color: #4b4f56; font-size: 0.9rem; }
-        input, select { width: 100%; padding: 12px; border: 1px solid #dddfe2; border-radius: 6px; box-sizing: border-box; font-size: 1rem; }
-        button { width: 100%; padding: 12px; background: #0080ff; color: white; border: none; border-radius: 6px; font-weight: bold; cursor: pointer; margin-top: 10px; }
-        button:hover { background: #0073e6; }
-        #results { margin-top: 20px; padding: 15px; border-top: 1px solid #eee; min-height: 50px; }
-        .rate-line { font-size: 1.1rem; font-weight: bold; color: #1d2129; margin: 10px 0; }
-        .price { color: #00a400; }
-        .error-msg { color: #d32f2f; background: #fdecea; padding: 10px; border-radius: 4px; font-size: 0.9rem; }
-    </style>
+    <title>Hotel Test</title>
 </head>
 <body>
+    <button onclick="testSync()">Click to Test Sync</button>
+    <div id="out">Output will appear here...</div>
 
-<div class="card">
-    <h2>Hotel Rate Tracker</h2>
-    
-    <div class="input-group">
-        <label>Location Key</label>
-        <input type="text" id="locKey" value="g31407">
-        <button onclick="syncHotels()">1. Sync Hotels</button>
-    </div>
-
-    <div class="input-group">
-        <label>Select Hotel</label>
-        <select id="hotelDropdown" onchange="fetchBookingRate()" disabled>
-            <option>Sync location first...</option>
-        </select>
-    </div>
-
-    <div id="results">
-        <div id="status">Ready.</div>
-    </div>
-</div>
-
-<script>
-    // Configuration
-    const PROXY = "https://corsproxy.io/?url=";
-    const CHK_IN = "2026-01-19";
-    const CHK_OUT = "2026-01-20";
-    let hotelNames = {};
-
-    // Error Catcher: Shows errors on screen instead of blank page
-    window.onerror = function(msg) {
-        document.getElementById('results').innerHTML = `<div class="error-msg">Error: ${msg}</div>`;
-    };
-
-    async function syncHotels() {
-        const locKey = document.getElementById('locKey').value;
-        const dropdown = document.getElementById('hotelDropdown');
-        const status = document.getElementById('status');
-        
-        status.innerText = "Syncing list...";
-        
-        try {
-            const url = `${PROXY}${encodeURIComponent('https://data.xotelo.com/api/list?location_key=' + locKey)}`;
-            const res = await fetch(url);
-            const data = await res.json();
-
-            if (data.result && data.result.hotels) {
-                dropdown.innerHTML = '<option value="">-- Select a Hotel --</option>';
-                data.result.hotels.forEach(h => {
-                    hotelNames[h.hotel_key] = h.name;
-                    let opt = document.createElement('option');
-                    opt.value = h.hotel_key;
-                    opt.textContent = h.name;
-                    dropdown.appendChild(opt);
-                });
-                dropdown.disabled = false;
-                status.innerText = "✓ " + data.result.hotels.length + " hotels found.";
+    <script>
+        async function testSync() {
+            const out = document.getElementById('out');
+            out.innerText = "Connecting...";
+            const proxy = "https://corsproxy.io/?url=";
+            const target = "https://data.xotelo.com/api/list?location_key=g31407";
+            
+            try {
+                const res = await fetch(proxy + encodeURIComponent(target));
+                const data = await res.json();
+                out.innerText = "Success! Found " + data.result.hotels.length + " hotels.";
+            } catch (e) {
+                out.innerText = "Error: " + e.message;
             }
-        } catch (e) {
-            status.innerHTML = `<div class="error-msg">Sync Failed: ${e.message}</div>`;
         }
-    }
-
-    async function fetchBookingRate() {
-        const key = document.getElementById('hotelDropdown').value;
-        const results = document.getElementById('results');
-        if (!key) return;
-
-        results.innerHTML = "Searching Booking.com...";
-
-        try {
-            const url = `${PROXY}${encodeURIComponent(`https://data.xotelo.com/api/rates?hotel_key=${key}&chk_in=${CHK_IN}&chk_out=${CHK_OUT}`)}`;
-            const res = await fetch(url);
-            const data = await res.json();
-
-            if (data.result && data.result.rates) {
-                const bRate = data.result.rates.find(r => r.site_name === "Booking.com");
-                if (bRate) {
-                    results.innerHTML = `
-                        <div class="rate-line">
-                            ${hotelNames[key]}: <span class="price">$${bRate.rate}</span>
-                        </div>
-                    `;
-                } else {
-                    results.innerHTML = "No Booking.com rate found for this property.";
-                }
-            }
-        } catch (e) {
-            results.innerHTML = `<div class="error-msg">Rate Fetch Failed: ${e.message}</div>`;
-        }
-    }
-</script>
-
+    </script>
 </body>
 </html>
