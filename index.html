@@ -1,27 +1,73 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <title>Hotel Test</title>
+  <meta charset="UTF-8">
+  <title>Hotel Booking.com Rates</title>
+  <style>
+    body { font-family: Arial, sans-serif; padding: 20px; }
+    button { padding: 10px 20px; margin-bottom: 20px; }
+    table { border-collapse: collapse; width: 100%; }
+    th, td { border: 1px solid #ccc; padding: 8px; text-align: left; }
+    th { background-color: #f4f4f4; }
+  </style>
 </head>
 <body>
-    <button onclick="testSync()">Click to Test Sync</button>
-    <div id="out">Output will appear here...</div>
 
-    <script>
-        async function testSync() {
-            const out = document.getElementById('out');
-            out.innerText = "Connecting...";
-            const proxy = "https://corsproxy.io/?url=";
-            const target = "https://data.xotelo.com/api/list?location_key=g31407";
-            
-            try {
-                const res = await fetch(proxy + encodeURIComponent(target));
-                const data = await res.json();
-                out.innerText = "Success! Found " + data.result.hotels.length + " hotels.";
-            } catch (e) {
-                out.innerText = "Error: " + e.message;
-            }
-        }
-    </script>
+<h1>Hotel Booking.com Rates</h1>
+<button id="getRatesBtn">Get Rates</button>
+
+<table id="ratesTable">
+  <thead>
+    <tr>
+      <th>Hotel Name</th>
+      <th>Booking.com Rate (USD)</th>
+    </tr>
+  </thead>
+  <tbody></tbody>
+</table>
+
+<script>
+const locationKey = "g31407";
+const checkIn = "2026-01-19";
+const checkOut = "2026-01-20";
+
+document.getElementById("getRatesBtn").addEventListener("click", async () => {
+  const tableBody = document.querySelector("#ratesTable tbody");
+  tableBody.innerHTML = "<tr><td colspan='2'>Loading...</td></tr>";
+
+  try {
+    // 1️⃣ Get hotel list
+    const listResp = await fetch(`https://data.xotelo.com/api/list?location_key=${locationKey}`, {
+      headers: { "accept": "application/json" }
+    });
+    const hotelList = (await listResp.json()).result.list;
+
+    const hotelRates = [];
+
+    // 2️⃣ Loop through hotels and fetch Booking.com rates
+    for (const hotel of hotelList) {
+      const ratesResp = await fetch(`https://data.xotelo.com/api/rates?hotel_key=${hotel.key}&chk_in=${checkIn}&chk_out=${checkOut}`, {
+        headers: { "accept": "application/json" }
+      });
+      const ratesData = (await ratesResp.json()).result.rates;
+
+      const bookingRateObj = ratesData.find(r => r.code === "BookingCom");
+      if (bookingRateObj) {
+        hotelRates.push({ name: hotel.name, rate: bookingRateObj.rate });
+      }
+    }
+
+    // 3️⃣ Sort by rate ascending
+    hotelRates.sort((a, b) => a.rate - b.rate);
+
+    // 4️⃣ Render table
+    tableBody.innerHTML = hotelRates.map(h => `<tr><td>${h.name}</td><td>$${h.rate}</td></tr>`).join("");
+  } catch (err) {
+    console.error(err);
+    tableBody.innerHTML = "<tr><td colspan='2'>Error fetching rates. Check console.</td></tr>";
+  }
+});
+</script>
+
 </body>
 </html>
