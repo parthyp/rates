@@ -1,138 +1,73 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Booking.com Deal Finder</title>
-    <style>
-        :root { --booking-blue: #003580; --booking-light: #ebf3ff; --success: #008009; }
-        body { font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background: #f5f5f5; padding: 20px; }
-        .container { max-width: 600px; margin: 0 auto; }
-        .card { background: white; border-radius: 4px; border: 1px solid #ddd; padding: 20px; }
-        
-        .header { background: var(--booking-blue); color: white; margin: -20px -20px 20px -20px; padding: 15px 20px; border-radius: 4px 4px 0 0; display: flex; justify-content: space-between; align-items: center; }
-        .controls { display: flex; gap: 10px; margin-bottom: 20px; }
-        input { flex-grow: 1; padding: 10px; border: 1px solid #868686; border-radius: 4px; }
-        button { padding: 10px 20px; background: #006ce4; color: white; border: none; border-radius: 4px; font-weight: bold; cursor: pointer; }
-        button:hover { background: #0056b3; }
-
-        .progress-container { height: 8px; background: #eee; border-radius: 4px; margin-bottom: 20px; display: none; overflow: hidden; }
-        .progress-bar { height: 100%; background: #ffb700; width: 0%; transition: width 0.3s; }
-        
-        .result-item { display: flex; justify-content: space-between; align-items: center; padding: 15px; border: 1px solid #e7e7e7; margin-bottom: 10px; border-radius: 4px; }
-        .hotel-info { display: flex; flex-direction: column; }
-        .hotel-name { font-weight: bold; font-size: 1.1rem; color: #003580; }
-        .date-label { font-size: 0.8rem; color: #555; }
-        .price-section { text-align: right; }
-        .price { font-size: 1.4rem; font-weight: bold; color: var(--success); }
-        .site-badge { background: var(--booking-light); color: var(--booking-blue); font-size: 0.7rem; padding: 2px 6px; border-radius: 3px; font-weight: bold; margin-top: 4px; display: inline-block; }
-        
-        #status { font-size: 0.85rem; color: #666; margin-bottom: 10px; }
-    </style>
-</head>
-<body>
-
-<div class="container">
-    <div class="card">
-        <div class="header">
-            <h3 style="margin:0">Booking.com Rate Scraper</h3>
-            <span style="font-size: 0.8rem;">Jan 19 - Jan 20</span>
-        </div>
-
-        <div class="controls">
-            <input type="text" id="locKey" value="g31407" placeholder="Location Key">
-            <button onclick="runScraper()">Find Deals</button>
-        </div>
-
-        <div id="status">Enter location key to begin...</div>
-        <div id="progressCont" class="progress-container"><div id="progressBar" class="progress-bar"></div></div>
-        
-        <div id="resultsList">
-            </div>
-    </div>
-</div>
-
 <script>
-    const CHK_IN = "2026-01-19";
-    const CHK_OUT = "2026-01-20";
-    const TARGET_SITE = "Booking.com";
+    // This is the middleman that fixes the CORS error
+    const proxy = "https://corsproxy.io/?url=";
+    
+    // Your exact dates
+    const today = "2026-01-19";
+    const tomorrow = "2026-01-20";
+    let hotelMap = {};
 
-    async function runScraper() {
+    async function syncHotels() {
         const locKey = document.getElementById('locKey').value;
-        const listDiv = document.getElementById('resultsList');
-        const status = document.getElementById('status');
-        const progCont = document.getElementById('progressCont');
-        const progBar = document.getElementById('progressBar');
-
-        listDiv.innerHTML = "";
-        progCont.style.display = "block";
-        status.textContent = "Loading hotel list...";
+        const dropdown = document.getElementById('hotelDropdown');
+        
+        // Wrap the Xotelo URL inside the proxy URL
+        const targetUrl = `https://data.xotelo.com/api/list?location_key=${locKey}`;
+        const finalUrl = proxy + encodeURIComponent(targetUrl);
 
         try {
-            // 1. Get Hotel List
-            const listRes = await fetch(`https://data.xotelo.com/api/list?location_key=${locKey}`);
-            const listData = await listRes.json();
-            const hotels = listData.result.hotels.slice(0, 40); // Scan more to find 20 with Booking.com rates
-
-            let bookingDeals = [];
-
-            // 2. Scan for Booking.com Rates
-            for (let i = 0; i < hotels.length; i++) {
-                const hotel = hotels[i];
-                status.textContent = `Scanning ${i+1}/${hotels.length}: ${hotel.name}`;
-                progBar.style.width = `${((i+1)/hotels.length)*100}%`;
-
-                try {
-                    const rateRes = await fetch(`https://data.xotelo.com/api/rates?hotel_key=${hotel.hotel_key}&chk_in=${CHK_IN}&chk_out=${CHK_OUT}`);
-                    const rateData = await rateRes.json();
-
-                    if (rateData.result && rateData.result.rates) {
-                        // Filter for only Booking.com
-                        const bRate = rateData.result.rates.find(r => r.site_name === TARGET_SITE);
-                        if (bRate) {
-                            bookingDeals.push({
-                                name: hotel.name,
-                                price: parseFloat(bRate.rate)
-                            });
-                        }
-                    }
-                } catch (e) { console.error("Error fetching rate for " + hotel.name); }
+            const response = await fetch(finalUrl);
+            const data = await response.json();
+            
+            if(data.result && data.result.hotels) {
+                dropdown.innerHTML = '<option value="">-- Choose Hotel --</option>';
+                data.result.hotels.forEach(h => {
+                    hotelMap[h.hotel_key] = h.name;
+                    let opt = document.createElement('option');
+                    opt.value = h.hotel_key;
+                    opt.innerText = h.name;
+                    dropdown.appendChild(opt);
+                });
+                dropdown.disabled = false;
+                document.getElementById('status').innerText = "✓ Hotels Loaded";
             }
+        } catch (e) {
+            document.getElementById('status').innerText = "Sync Error. Try again.";
+            console.error(e);
+        }
+    }
 
-            // 3. Sort and Display Top 20
-            bookingDeals.sort((a, b) => a.price - b.price);
-            const top20 = bookingDeals.slice(0, 20);
+    async function executeRates() {
+        const hotelKey = document.getElementById('hotelDropdown').value;
+        const rateList = document.getElementById('rateList');
+        if(!hotelKey) return;
 
-            progCont.style.display = "none";
-            status.textContent = `Found ${bookingDeals.length} deals. Showing top 20:`;
+        rateList.innerHTML = "Fetching Booking.com rates...";
 
-            if (top20.length === 0) {
-                listDiv.innerHTML = "<p>No Booking.com rates found for this location.</p>";
-                return;
+        const targetUrl = `https://data.xotelo.com/api/rates?hotel_key=${hotelKey}&chk_in=${today}&chk_out=${tomorrow}`;
+        const finalUrl = proxy + encodeURIComponent(targetUrl);
+
+        try {
+            const response = await fetch(finalUrl);
+            const data = await response.json();
+            rateList.innerHTML = "";
+
+            if (data.result && data.result.rates) {
+                // Look only for Booking.com
+                const bookingRate = data.result.rates.find(r => r.site_name === "Booking.com");
+                
+                if (bookingRate) {
+                    rateList.innerHTML = `
+                        <div style="font-size:1.2rem; font-weight:bold;">
+                            ${hotelMap[hotelKey]}: <span style="color:#008009;">$${bookingRate.rate}</span>
+                        </div>
+                    `;
+                } else {
+                    rateList.innerHTML = "No Booking.com rate found for this hotel.";
+                }
             }
-
-            top20.forEach(item => {
-                const div = document.createElement('div');
-                div.className = 'result-item';
-                div.innerHTML = `
-                    <div class="hotel-info">
-                        <span class="hotel-name">${item.name}</span>
-                        <span class="site-badge">BOOKING.COM EXCLUSIVE</span>
-                    </div>
-                    <div class="price-section">
-                        <div class="date-label">Today's Rate:</div>
-                        <div class="price">$${item.price}</div>
-                    </div>
-                `;
-                listDiv.appendChild(div);
-            });
-
-        } catch (err) {
-            status.textContent = "Error: " + err.message;
-            progCont.style.display = "none";
+        } catch (e) {
+            rateList.innerHTML = "Error loading rates.";
         }
     }
 </script>
-
-</body>
-</html>
