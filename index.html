@@ -20,48 +20,24 @@
   <thead>
     <tr>
       <th>Hotel Name</th>
-      <th>Booking.com Rate (USD)</th>
+      <th>Booking.com Rate with Surcharge (USD)</th>
     </tr>
   </thead>
   <tbody></tbody>
 </table>
 
 <script>
-const locationKey = "g31407";
-const checkIn = "2026-01-19";
-const checkOut = "2026-01-20";
-
 document.getElementById("getRatesBtn").addEventListener("click", async () => {
   const tableBody = document.querySelector("#ratesTable tbody");
   tableBody.innerHTML = "<tr><td colspan='2'>Loading...</td></tr>";
 
   try {
-    // 1️⃣ Get hotel list
-    const listResp = await fetch(`https://data.xotelo.com/api/list?location_key=${locationKey}`, {
-      headers: { "accept": "application/json" }
-    });
-    const hotelList = (await listResp.json()).result.list;
+    const resp = await fetch("http://localhost:3000/booking-rates"); // Call your Node proxy
+    const hotelRates = await resp.json();
 
-    const hotelRates = [];
-
-    // 2️⃣ Loop through hotels and fetch Booking.com rates
-    for (const hotel of hotelList) {
-      const ratesResp = await fetch(`https://data.xotelo.com/api/rates?hotel_key=${hotel.key}&chk_in=${checkIn}&chk_out=${checkOut}`, {
-        headers: { "accept": "application/json" }
-      });
-      const ratesData = (await ratesResp.json()).result.rates;
-
-      const bookingRateObj = ratesData.find(r => r.code === "BookingCom");
-      if (bookingRateObj) {
-        hotelRates.push({ name: hotel.name, rate: bookingRateObj.rate });
-      }
-    }
-
-    // 3️⃣ Sort by rate ascending
-    hotelRates.sort((a, b) => a.rate - b.rate);
-
-    // 4️⃣ Render table
-    tableBody.innerHTML = hotelRates.map(h => `<tr><td>${h.name}</td><td>$${h.rate}</td></tr>`).join("");
+    tableBody.innerHTML = hotelRates
+      .map(h => `<tr><td>${h.name}</td><td>$${h.rate}</td></tr>`)
+      .join("");
   } catch (err) {
     console.error(err);
     tableBody.innerHTML = "<tr><td colspan='2'>Error fetching rates. Check console.</td></tr>";
